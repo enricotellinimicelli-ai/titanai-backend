@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cut">
+<meta name="theme-color" content="#4f46e5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meu Dia">
+<title>Meu Dia</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #f5f5fa; --card: #ffffff; --text: #17172b; --muted: #6b6b80;
+    --line: #e5e5ee; --accent: #4f46e5; --accent-soft: #eceaff; --ok: #16a34a;
+    --danger: #dc2626; --shadow: 0 1px 3px rgba(20,20,50,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f0f17; --card: #1a1a26; --text: #f0f0f7; --muted: #9a9ab0;
+      --line: #2a2a3a; --accent: #818cf8; --accent-soft: #25254a; --ok: #4ade80;
+      --danger: #f87171; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: env(safe-area-inset-top) 0 calc(96px + env(safe-area-inset-bottom)); }
+  main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+  header { padding: 24px 0 8px; }
+  header h1 { margin: 0; font-size: 28px; }
+  header p { margin: 4px 0 0; color: var(--muted); }
+  .tabs { display: flex; gap: 8px; margin: 16px 0; }
+  .tabs button { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font-weight: 600; font-size: 15px; }
+  .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .banner { background: var(--accent-soft); border-radius: 14px; padding: 12px 14px;
+    margin: 8px 0 16px; font-size: 14px; display: flex; gap: 10px; align-items: center; }
+  .banner button { margin-left: auto; white-space: nowrap; }
+  .progress { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 4px 0 16px; }
+  .progress div { height: 100%; background: var(--ok); width: 0; transition: width .3s; }
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .task { display: flex; align-items: center; gap: 12px; background: var(--card);
+    border-radius: 16px; padding: 14px; box-shadow: var(--shadow); border: 1px solid var(--line); }
+  .task .emoji { font-size: 28px; width: 40px; text-align: center; flex-shrink: 0; }
+  .task .info { flex: 1; min-width: 0; }
+  .task .name { font-weight: 600; overflow-wrap: anywhere; }
+  .task .meta { color: var(--muted); font-size: 14px; }
+  .task.done .name { text-decoration: line-through; color: var(--muted); }
+  .task.done { opacity: .7; }
+  .check { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line);
+    background: transparent; color: #fff; font-size: 18px; flex-shrink: 0; }
+  .task.done .check { background: var(--ok); border-color: var(--ok); }
+  .edit { background: none; border: none; color: var(--muted); font-size: 20px; padding: 6px; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 16px; }
+  .day-title { font-weight: 700; margin: 20px 0 8px; }
+  .btn { border: none; border-radius: 12px; padding: 12px 16px; font-weight: 600;
+    font-size: 15px; background: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  .btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--line); }
+  .btn.small { padding: 8px 12px; font-size: 14px; }
+  .fab { position: fixed; right: 20px; bottom: calc(24px + env(safe-area-inset-bottom));
+    width: 60px; height: 60px; border-radius: 50%; font-size: 32px; line-height: 1;
+    box-shadow: 0 6px 20px rgba(79,70,229,.4); }
+  .tools { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
+
+  /* Formulário */
+  dialog { border: none; border-radius: 20px 20px 0 0; padding: 0; width: 100%; max-width: 560px;
+    margin: auto auto 0; background: var(--card); color: var(--text); max-height: 92vh; }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  form { padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; }
+  form h2 { margin: 0; font-size: 20px; }
+  label { font-size: 14px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 6px; }
+  input, select { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font-size: 16px; font-family: inherit; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; min-width: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font-size: 15px; min-width: 44px; }
+  .chips button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .emojis button { font-size: 22px; padding: 6px 8px; }
+  .times { display: flex; flex-direction: column; gap: 8px; }
+  .times .row { align-items: center; }
+  .times .row button { flex: 0 0 auto; }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .actions { display: flex; gap: 10px; }
+  .actions .btn { flex: 1; }
+
+  /* Tela de alarme */
+  #alarm { position: fixed; inset: 0; background: var(--accent); color: #fff; z-index: 50;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 24px; gap: 12px; }
+  #alarm.show { display: flex; }
+  #alarm .big { font-size: 96px; animation: ring 0.6s ease-in-out infinite alternate; }
+  #alarm h2 { font-size: 30px; margin: 0; overflow-wrap: anywhere; }
+  #alarm p { margin: 0; font-size: 20px; opacity: .9; }
+  #alarm .actions { width: 100%; max-width: 360px; flex-direction: column; margin-top: 24px; }
+  #alarm .btn { background: #fff; color: var(--accent); font-size: 18px; padding: 16px; }
+  #alarm .btn.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.5); }
+  @keyframes ring { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
+  @media (prefers-reduced-motion: reduce) { #alarm .big { animation: none; } }
+  .toast { position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom));
+    transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px;
+    border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none;
+    max-width: calc(100% - 32px); text-align: center; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="greeting">Olá!</h1>
+    <p id="today-date"></p>
+  </header>
+
+  <div id="notif-banner" class="banner" hidden>
+    <span>🔔 Ative as notificações para o alarme tocar.</span>
+    <button class="btn small" id="enable-notif">Ativar</button>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="hoje" class="on">Hoje</button>
+    <button data-tab="semana">Semana</button>
+    <button data-tab="todas">Tarefas</button>
+  </div>
+
+  <section id="tab-hoje">
+    <div class="progress"><div id="progress-bar"></div></div>
+    <div class="list" id="today-list"></div>
+  </section>
+
+  <section id="tab-semana" hidden></section>
+
+  <section id="tab-todas" hidden>
+    <div class="list" id="all-list"></div>
+    <div class="tools">
+      <button class="btn ghost" id="export-ics">📅 Exportar para o calendário do celular</button>
+      <p class="hint">O calendário do celular toca os lembretes mesmo com o app fechado. Exporte de novo sempre que mudar as tarefas.</p>
+      <button class="btn ghost" id="test-alarm">🔊 Testar alarme</button>
+    </div>
+  </section>
+</main>
+
+<button class="btn fab" id="add" aria-label="Nova tarefa">+</button>
+
+<dialog id="dlg">
+  <form id="form" method="dialog">
+    <h2 id="form-title">Nova tarefa</h2>
+    <div>
+      <label for="f-name">O que fazer?</label>
+      <input id="f-name" required maxlength="60" placeholder="Ex.: Levar o cachorro para passear">
+    </div>
+    <div>
+      <label>Ícone</label>
+      <div class="chips emojis" id="f-emojis"></div>
+    </div>
+    <div>
+      <label>Horários do alarme</label>
+      <div class="times" id="f-times"></div>
+      <button type="button" class="btn ghost small" id="f-add-time" style="margin-top:8px">+ outro horário</button>
+    </div>
+    <div>
+      <label for="f-repeat">Repetir</label>
+      <select id="f-repeat">
+        <option value="weekly">Em dias da semana</option>
+        <option value="interval">A cada X dias (rodízio)</option>
+        <option value="once">Só uma vez</option>
+      </select>
+    </div>
+    <div id="opt-weekly">
+      <div class="chips" id="f-days"></div>
+    </div>
+    <div id="opt-interval" hidden>
+      <div class="row">
+        <div><label for="f-every">A cada</label>
+          <select id="f-every"></select></div>
+        <div><label for="f-start">Começando em</label>
+          <input type="date" id="f-start"></div>
+      </div>
+      <p class="hint">Bom para revezamento: “lavo a louça um dia sim, um dia não” → a cada 2 dias.</p>
+    </div>
+    <div id="opt-once" hidden>
+      <label for="f-date">Dia</label>
+      <input type="date" id="f-date">
+    </div>
+    <div class="actions">
+      <button type="button" class="btn danger" id="f-delete" hidden>Excluir</button>
+      <button type="button" class="btn ghost" id="f-cancel">Cancelar</button>
+      <button type="submit" class="btn">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="alarm" role="alertdialog" aria-live="assertive">
+  <div class="big" id="alarm-emoji">⏰</div>
+  <h2 id="alarm-name"></h2>
+  <p id="alarm-time"></p>
+  <div class="actions">
+    <button class="btn" id="alarm-done">✓ Feito!</button>
+    <button class="btn ghost" id="alarm-snooze">Lembrar em 10 min</button>
+    <button class="btn ghost" id="alarm-stop">Só parar o som</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const EMOJIS = ['🐕','🍽️','💪','🏋️','🏃','🧹','🧺','🗑️','🪴','💊','🛒','📚','🚿','🐈','💧','⭐'];
+const KEY = 'meudia.v1';
+const $ = s => document.querySelector(s);
+
+// ---------- Datas ----------
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const dayDiff = (a, b) => Math.round((parseYmd(ymd(a)) - parseYmd(ymd(b))) / 86400000);
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+
+// ---------- Estado ----------
+function defaults() {
+  const today = ymd(new Date());
+  return {
+    tasks: [
+      { id: uid(), name: 'Levar o cachorro para passear', emoji: '🐕', times: ['07:00', '18:30'], repeat: 'weekly', days: [0,1,2,3,4,5,6] },
+      { id: uid(), name: 'Lavar a louça', emoji: '🍽️', times: ['20:00'], repeat: 'interval', every: 2, start: today },
+      { id: uid(), name: 'Academia', emoji: '🏋️', times: ['18:00'], repeat: 'weekly', days: [1,3,5] },
+      { id: uid(), name: 'Treino de corrida', emoji: '🏃', times: ['07:30'], repeat: 'weekly', days: [2,4] },
+    ],
+    done: {},   // { 'AAAA-MM-DD': { 'idTarefa@HH:MM': true } }
+    fired: {},  // alarmes já tocados por dia
+    snoozes: [] // { taskId, time, at (ms) }
+  };
+}
+function uid() { return Math.random().toString(36).slice(2, 10); }
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.tasks) return s; } catch {}
+  return defaults();
+}
+let state = load();
+function save() {
+  // guarda só os últimos 14 dias de histórico
+  const cutoff = ymd(addDays(new Date(), -14));
+  for (const k of ['done', 'fired']) for (const d in state[k]) if (d < cutoff) delete state[k][d];
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
+}
+
+function occursOn(t, date) {
+  if (t.repeat === 'weekly') return t.days.includes(date.getDay());
+  if (t.repeat === 'interval') {
+    const diff = dayDiff(date, parseYmd(t.start));
+    return diff >= 0 && diff % t.every === 0;
+  }
+  if (t.repeat === 'once') return t.date === ymd(date);
+  return false;
+}
+function itemsFor(date) {
+  const out = [];
+  for (const t of state.tasks) if (occursOn(t, date))
+    for (const time of t.times) out.push({ task: t, time, key: `${t.id}@${time}` });
+  return out.sort((a, b) => a.time.localeCompare(b.time));
+}
+function repeatLabel(t) {
+  if (t.repeat === 'weekly') return t.days.length === 7 ? 'Todo dia' : t.days.slice().sort().map(d => DAYS[d]).join(', ');
+  if (t.repeat === 'interval') {
+    const next = nextOccurrence(t);
+    return `A cada ${t.every} dias` + (next ? ` · próximo: ${next}` : '');
+  }
+  return 'Em ' + parseYmd(t.date).toLocaleDateString('pt-BR');
+}
+function nextOccurrence(t) {
+  for (let i = 0; i < 60; i++) {
+    const d = addDays(new Date(), i);
+    if (occursOn(t, d)) return i === 0 ? 'hoje' : i === 1 ? 'amanhã' : d.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric' });
+  }
+  return '';
+}
+
+// ---------- Interface ----------
+const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function render() {
+  const now = new Date();
+  const h = now.getHours();
+  $('#greeting').textContent = h < 12 ? 'Bom dia! ☀️' : h < 18 ? 'Boa tarde! 🌤️' : 'Boa noite! 🌙';
+  $('#today-date').textContent = cap(now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }));
+
+  // Hoje
+  const today = ymd(now);
+  const items = itemsFor(now);
+  const done = state.done[today] || {};
+  const doneCount = items.filter(i => done[i.key]).length;
+  $('#progress-bar').style.width = items.length ? (doneCount / items.length * 100) + '%' : '0';
+  $('#today-list').innerHTML = items.length ? items.map(i => `
+    <div class="task ${done[i.key] ? 'done' : ''}">
+      <div class="emoji">${i.task.emoji}</div>
+      <div class="info"><div class="name">${esc(i.task.name)}</div>
+        <div class="meta">⏰ ${i.time}</div></div>
+      <button class="check" data-toggle="${i.key}" aria-label="Marcar como feito">${done[i.key] ? '✓' : ''}</button>
+    </div>`).join('')
+    : '<div class="empty">🎉 Nada marcado para hoje.<br>Toque em + para criar uma tarefa.</div>';
+  if (items.length && doneCount === items.length)
+    $('#today-list').insertAdjacentHTML('beforeend', '<div class="empty">🏆 Tudo feito hoje. Mandou bem!</div>');
+
+  // Semana
+  let week = '';
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(now, i);
+    const its = itemsFor(d);
+    const title = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : cap(d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric' }));
+    week += `<div class="day-title">${title}</div><div class="list">` + (its.length ? its.map(x => `
+      <div class="task"><div class="emoji">${x.task.emoji}</div>
+        <div class="info"><div class="name">${esc(x.task.name)}</div><div class="meta">⏰ ${x.time}</div></div></div>`).join('')
+      : '<div class="meta" style="color:var(--muted)">Dia livre</div>') + '</div>';
+  }
+  $('#tab-semana').innerHTML = week;
+
+  // Todas
+  $('#all-list').innerHTML = state.tasks.length ? state.tasks.map(t => `
+    <div class="task">
+      <div class="emoji">${t.emoji}</div>
+      <div class="info"><div class="name">${esc(t.name)}</div>
+        <div class="meta">⏰ ${t.times.join(', ')} · ${repeatLabel(t)}</div></div>
+      <button class="edit" data-edit="${t.id}" aria-label="Editar">✏️</button>
+    </div>`).join('') : '<div class="empty">Nenhuma tarefa ainda.</div>';
+
+  updateNotifBanner();
+}
+
+document.querySelector('.tabs').addEventListener('click', e => {
+  const tab = e.target.dataset.tab; if (!tab) return;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  for (const n of ['hoje', 'semana', 'todas']) $('#tab-' + n).hidden = n !== tab;
+});
+
+document.addEventListener('click', e => {
+  const tog = e.target.closest('[data-toggle]');
+  if (tog) {
+    const today = ymd(new Date());
+    const d = state.done[today] ||= {};
+    d[tog.dataset.toggle] ? delete d[tog.dataset.toggle] : d[tog.dataset.toggle] = true;
+    if (d[tog.dataset.toggle] && navigator.vibrate) navigator.vibrate(30);
+    save(); render();
+  }
+  const ed = e.target.closest('[data-edit]');
+  if (ed) openForm(state.tasks.find(t => t.id === ed.dataset.edit));
+});
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ---------- Formulário ----------
+let editing = null, fEmoji = EMOJIS[0], fDays = [];
+$('#f-emojis').innerHTML = EMOJIS.map(e => `<button type="button" data-emoji="${e}">${e}</button>`).join('');
+$('#f-days').innerHTML = DAYS.map((d, i) => `<button type="button" data-day="${i}">${d}</button>`).join('');
+$('#f-every').innerHTML = [2,3,4,5,6,7,14].map(n => `<option value="${n}">${n} dias</option>`).join('');
+
+function setEmoji(e) { fEmoji = e; document.querySelectorAll('[data-emoji]').forEach(b => b.classList.toggle('on', b.dataset.emoji === e)); }
+function setDays(ds) { fDays = ds; document.querySelectorAll('[data-day]').forEach(b => b.classList.toggle('on', ds.includes(+b.dataset.day))); }
+function setRepeat(r) { $('#f-repeat').value = r; for (const k of ['weekly', 'interval', 'once']) $('#opt-' + k).hidden = k !== r; }
+function addTimeRow(v) {
+  const row = document.createElement('div'); row.className = 'row';
+  row.innerHTML = `<input type="time" required value="${v}"><button type="button" class="btn danger small" aria-label="Remover horário">✕</button>`;
+  row.querySelector('button').onclick = () => { if ($('#f-times').children.length > 1) row.remove(); };
+  $('#f-times').appendChild(row);
+}
+
+function openForm(t) {
+  editing = t || null;
+  const today = ymd(new Date());
+  $('#form-title').textContent = t ? 'Editar tarefa' : 'Nova tarefa';
+  $('#f-name').value = t ? t.name : '';
+  setEmoji(t ? t.emoji : EMOJIS[0]);
+  $('#f-times').innerHTML = ''; (t ? t.times : ['08:00']).forEach(addTimeRow);
+  setRepeat(t ? t.repeat : 'weekly');
+  setDays(t && t.days ? [...t.days] : [new Date().getDay()]);
+  $('#f-every').value = t && t.every ? t.every : 2;
+  $('#f-start').value = t && t.start ? t.start : today;
+  $('#f-date').value = t && t.date ? t.date : today;
+  $('#f-delete').hidden = !t;
+  $('#dlg').showModal();
+}
+
+$('#add').onclick = () => openForm();
+$('#f-cancel').onclick = () => $('#dlg').close();
+$('#f-add-time').onclick = () => addTimeRow('12:00');
+$('#f-repeat').onchange = e => setRepeat(e.target.value);
+$('#f-emojis').onclick = e => { const b = e.target.closest('[data-emoji]'); if (b) setEmoji(b.dataset.emoji); };
+$('#f-days').onclick = e => {
+  const b = e.target.closest('[data-day]'); if (!b) return;
+  const d = +b.dataset.day;
+  setDays(fDays.includes(d) ? fDays.filter(x => x !== d) : [...fDays, d]);
+};
+$('#f-delete').onclick = () => {
+  if (!confirm('Excluir esta tarefa?')) return;
+  state.tasks = state.tasks.filter(t => t !== editing);
+  save(); render(); $('#dlg').close(); toast('Tarefa excluída');
+};
+$('#form').onsubmit = e => {
+  e.preventDefault();
+  const repeat = $('#f-repeat').value;
+  if (repeat === 'weekly' && !fDays.length) return toast('Escolha pelo menos um dia da semana');
+  const times = [...new Set([...$('#f-times').querySelectorAll('input')].map(i => i.value).filter(Boolean))].sort();
+  if (!times.length) return toast('Escolha um horário');
+  const t = { id: editing ? editing.id : uid(), name: $('#f-name').value.trim(), emoji: fEmoji, times, repeat };
+  if (repeat === 'weekly') t.days = fDays.slice().sort();
+  if (repeat === 'interval') { t.every = +$('#f-every').value; t.start = $('#f-start').value || ymd(new Date()); }
+  if (repeat === 'once') t.date = $('#f-date').value || ymd(new Date());
+  if (editing) state.tasks[state.tasks.indexOf(editing)] = t; else state.tasks.push(t);
+  save(); render(); $('#dlg').close(); toast('Tarefa salva ✓');
+  askNotifications();
+};
+
+// ---------- Alarme ----------
+let audioCtx = null, beepTimer = null, current = null;
+const queue = [];
+
+function unlockAudio() {
+  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+document.addEventListener('pointerdown', unlockAudio, { passive: true });
+
+function beep() {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  [0, 0.2, 0.4].forEach((off, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'square'; o.frequency.value = i === 2 ? 1046 : 880;
+    g.gain.setValueAtTime(0.0001, t0 + off);
+    g.gain.exponentialRampToValueAtTime(0.25, t0 + off + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + off + 0.16);
+    o.connect(g).connect(audioCtx.destination); o.start(t0 + off); o.stop(t0 + off + 0.18);
+  });
+}
+
+function ring(item) {
+  if (current) { queue.push(item); return; }
+  current = item;
+  $('#alarm-emoji').textContent = item.task.emoji;
+  $('#alarm-name').textContent = item.task.name;
+  $('#alarm-time').textContent = `⏰ ${item.time}` + (item.snoozed ? ' (adiado)' : '');
+  $('#alarm').classList.add('show');
+  unlockAudio(); beep();
+  if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+  clearInterval(beepTimer);
+  let n = 0;
+  beepTimer = setInterval(() => {
+    beep(); if (navigator.vibrate && n % 3 === 0) navigator.vibrate([400, 200, 400]);
+    if (++n > 90) stopSound(); // para sozinho após ~2 minutos
+  }, 1300);
+  notify(item);
+}
+function stopSound() { clearInterval(beepTimer); beepTimer = null; if (navigator.vibrate) navigator.vibrate(0); }
+function closeAlarm() {
+  stopSound(); $('#alarm').classList.remove('show'); current = null;
+  if (queue.length) setTimeout(() => ring(queue.shift()), 400);
+}
+$('#alarm-stop').onclick = stopSound;
+$('#alarm-done').onclick = () => {
+  const today = ymd(new Date());
+  (state.done[today] ||= {})[current.key] = true;
+  save(); render(); closeAlarm(); toast('Boa! ✓');
+};
+$('#alarm-snooze').onclick = () => {
+  state.snoozes.push({ taskId: current.task.id, time: current.time, at: Date.now() + 10 * 60000 });
+  save(); closeAlarm(); toast('Vou lembrar de novo em 10 minutos');
+};
+$('#test-alarm').onclick = () => {
+  unlockAudio();
+  ring({ task: { emoji: '⏰', name: 'Teste de alarme', id: 'teste' }, time: new Date().toTimeString().slice(0, 5), key: 'teste' });
+};
+
+async function notify(item) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const opts = { body: `⏰ ${item.time} — toque para abrir`, tag: item.key, renotify: true,
+    requireInteraction: true, vibrate: [400, 200, 400], icon: 'icon-192.png', badge: 'icon-192.png' };
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg) return reg.showNotification(`${item.task.emoji} ${item.task.name}`, opts);
+  } catch {}
+  try { new Notification(`${item.task.emoji} ${item.task.name}`, opts); } catch {}
+}
+
+// Confere a cada 10 s se chegou a hora de algum alarme
+function tick() {
+  const now = new Date(), today = ymd(now);
+  const hm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const fired = state.fired[today] ||= {};
+  const done = state.done[today] || {};
+  let changed = false;
+  for (const item of itemsFor(now)) {
+    if (fired[item.key] || done[item.key]) continue;
+    // toca no horário ou até 5 minutos depois (caso o celular tenha atrasado o app)
+    const [h, m] = item.time.split(':').map(Number);
+    const late = (now - new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m)) / 60000;
+    if (late >= 0 && late < 5) { fired[item.key] = true; changed = true; ring(item); }
+    else if (item.time < hm) { fired[item.key] = true; changed = true; } // perdido; não toca atrasado demais
+  }
+  for (const s of state.snoozes.slice()) if (s.at <= Date.now()) {
+    state.snoozes.splice(state.snoozes.indexOf(s), 1); changed = true;
+    const task = state.tasks.find(t => t.id === s.taskId);
+    if (task && !done[`${task.id}@${s.time}`]) ring({ task, time: s.time, key: `${task.id}@${s.time}`, snoozed: true });
+  }
+  if (changed) save();
+  if (ymd(now) !== tick.lastDay) { tick.lastDay = ymd(now); render(); }
+}
+
+// ---------- Notificações ----------
+function updateNotifBanner() {
+  $('#notif-banner').hidden = !('Notification' in window) || Notification.permission !== 'default';
+}
+async function askNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'default') return;
+  try { await Notification.requestPermission(); } catch {}
+  updateNotifBanner();
+}
+$('#enable-notif').onclick = async () => {
+  unlockAudio(); await askNotifications();
+  toast(Notification.permission === 'granted' ? 'Notificações ativadas 🔔' : 'Notificações bloqueadas');
+};
+
+// ---------- Exportar para o calendário (.ics) ----------
+$('#export-ics').onclick = () => {
+  const BYDAY = ['SU','MO','TU','WE','TH','FR','SA'];
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const icsEsc = s => s.replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Meu Dia//Lembretes//PT', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Meu Dia'];
+  for (const t of state.tasks) for (const time of t.times) {
+    let start, rule = null;
+    if (t.repeat === 'weekly') {
+      // primeiro dia (a partir de hoje) que bate com a regra
+      start = new Date(); while (!t.days.includes(start.getDay())) start = addDays(start, 1);
+      rule = `RRULE:FREQ=WEEKLY;BYDAY=${t.days.map(d => BYDAY[d]).join(',')}`;
+    } else if (t.repeat === 'interval') {
+      start = parseYmd(t.start); rule = `RRULE:FREQ=DAILY;INTERVAL=${t.every}`;
+    } else start = parseYmd(t.date);
+    const [h, m] = time.split(':');
+    const dt = `${ymd(start).replace(/-/g, '')}T${h}${m}00`;
+    lines.push('BEGIN:VEVENT', `UID:${t.id}-${h}${m}@meudia`, `DTSTAMP:${stamp}`,
+      `DTSTART:${dt}`, 'DURATION:PT15M', `SUMMARY:${icsEsc(t.emoji + ' ' + t.name)}`);
+    if (rule) lines.push(rule);
+    lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(t.name)}`, 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'meu-dia.ics';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast('Abra o arquivo baixado para adicionar ao calendário');
+};
+
+// ---------- Início ----------
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); render(); } });
+render();
+tick();
+setInterval(tick, 10000);
+setInterval(render, 60000);
+</script>
+</body>
+</html>
