@@ -13,6 +13,15 @@ lavar a louça, academia, treino etc.
 - **Resumo da manhã**: num horário escolhido (padrão 06:30), o alarme toca e uma voz
   diz "Bom dia, Henrico! Hoje você tem: ..." com as tarefas e horários do dia.
   Nome e horário ficam em Tarefas → Resumo da manhã.
+- **🏃 Condicionamento físico** (categoria própria, integrada às abas):
+  - Seg: treino de resistência com passos da etapa atual + treino guiado com voz.
+  - Ter 15h / Qui 17h: aviso do treino no Democrata (16h / 18h).
+  - Qua: recuperação muscular (nada intenso). Sáb: caminhada leve opcional. Dom: descanso.
+  - Alarme com Feito / Lembrar em 10 min / Pular; histórico de treinos e evolução semanal.
+  - 4 etapas de evolução (adaptação → corrida contínua de 15–20 min); avançar é sempre
+    escolha do usuário, com sugestão baseada em "Como foi?" (fácil/na medida/difícil).
+  - Os treinos são adicionados uma única vez aos dados existentes, sem alterar
+    nenhum lembrete já cadastrado.
 - **Exportar para o calendário**: gera um `.ics` com as tarefas repetidas e
   alarme, para o calendário do celular tocar mesmo com o app fechado.
 - Os dados ficam salvos no próprio celular (sem login, sem servidor).

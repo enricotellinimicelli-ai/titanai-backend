@@ -25,6 +25,7 @@
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; background: var(--bg); color: var(--text);
     font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   body { padding: env(safe-area-inset-top) 0 calc(96px + env(safe-area-inset-bottom)); }
@@ -110,6 +111,47 @@
   #alarm .summary { font-size: 17px; max-width: 420px; text-align: left; background: rgba(255,255,255,.12);
     border-radius: 14px; padding: 12px 16px; line-height: 1.6; }
   #alarm .summary:empty { display: none; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; color: var(--accent);
+    background: var(--accent-soft); border-radius: 99px; padding: 1px 8px; margin-left: 4px; }
+  .task.fit { flex-wrap: wrap; }
+  .task .steps { margin: 6px 0 0; padding-left: 18px; font-size: 14px; color: var(--muted); }
+  .task .steps li { margin: 1px 0; }
+  .task .fit-actions { flex-basis: 100%; display: flex; gap: 8px; padding-left: 52px; }
+  .task .fit-actions .btn { flex: 1; }
+  .task.skipped .name { text-decoration: line-through; color: var(--muted); }
+  .task.skipped { opacity: .7; }
+  .task.skipped .check { border-style: dashed; }
+  .group-title { font-weight: 700; margin: 4px 0 8px; color: var(--muted); font-size: 14px;
+    text-transform: uppercase; letter-spacing: .04em; }
+  .group-title + .list { margin-bottom: 20px; }
+  .stages { display: flex; gap: 6px; }
+  .stages span { flex: 1; height: 8px; border-radius: 99px; background: var(--line); }
+  .stages span.on { background: var(--accent); }
+  .stages span.cur { background: var(--ok); }
+  .fit-plan { margin: 0; padding-left: 18px; font-size: 14px; }
+  .muted { color: var(--muted); font-size: 14px; margin: 0; }
+  .suggest { background: var(--accent-soft); border-radius: 12px; padding: 10px 12px; font-size: 14px; margin: 0; }
+  .hist { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+  .hist div { display: flex; gap: 8px; }
+  .hist div span:last-child { margin-left: auto; color: var(--muted); white-space: nowrap; }
+  #workout { position: fixed; inset: 0; background: var(--accent); color: #fff; z-index: 40;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 24px; gap: 10px; }
+  #workout.show { display: flex; }
+  #workout .big { font-size: 80px; }
+  #workout h2 { font-size: 30px; margin: 0; }
+  #workout .clock { font-size: 72px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #workout p { margin: 0; opacity: .9; font-size: 17px; }
+  #workout .bar { width: 100%; max-width: 360px; height: 8px; background: rgba(255,255,255,.25); border-radius: 99px; overflow: hidden; }
+  #workout .bar div { height: 100%; background: #fff; width: 0; }
+  #workout .actions { width: 100%; max-width: 360px; flex-direction: column; margin-top: 16px; display: flex; gap: 10px; }
+  #workout .btn { background: #fff; color: var(--accent); font-size: 18px; padding: 16px; }
+  #workout .btn.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.5); }
+  #feel { border-radius: 20px; margin: auto; max-width: 360px; }
+  #feel .box { padding: 20px 16px; display: flex; flex-direction: column; gap: 10px; text-align: center; }
+  #feel h2 { margin: 0 0 4px; font-size: 20px; }
+  textarea { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font-size: 16px; font-family: inherit; resize: vertical; }
   .toast { position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom));
     transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px;
     border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none;
@@ -143,6 +185,7 @@
   <section id="tab-semana" hidden></section>
 
   <section id="tab-todas" hidden>
+    <div class="card" id="fit-card"></div>
     <div class="card">
       <h3>☀️ Resumo da manhã</h3>
       <label class="switch">Ligado<input type="checkbox" id="m-on"></label>
@@ -170,6 +213,18 @@
     <div>
       <label for="f-name">O que fazer?</label>
       <input id="f-name" required maxlength="60" placeholder="Ex.: Levar o cachorro para passear">
+    </div>
+    <div>
+      <label for="f-cat">Categoria</label>
+      <select id="f-cat">
+        <option value="">📋 Lembrete</option>
+        <option value="fitness">🏃 Condicionamento físico</option>
+      </select>
+    </div>
+    <div id="f-details-wrap">
+      <label for="f-details">Descrição (opcional, um item por linha)</label>
+      <textarea id="f-details" rows="3" maxlength="600" placeholder="Ex.: Alongamento leve&#10;Beber água"></textarea>
+      <p class="hint" id="f-plan-hint" hidden>Os passos deste treino seguem a sua etapa de evolução (em Tarefas → Condicionamento físico).</p>
     </div>
     <div>
       <label>Ícone</label>
@@ -220,16 +275,43 @@
   <div class="actions">
     <button class="btn" id="alarm-speak" hidden>🔊 Ouvir meu dia</button>
     <button class="btn" id="alarm-done">✓ Feito!</button>
+    <button class="btn" id="alarm-start" hidden>▶ Iniciar treino guiado</button>
     <button class="btn ghost" id="alarm-snooze">Lembrar em 10 min</button>
+    <button class="btn ghost" id="alarm-skip" hidden>⏭ Pular hoje</button>
     <button class="btn ghost" id="alarm-stop">Só parar o som</button>
   </div>
 </div>
+
+<div id="workout" role="dialog" aria-label="Treino guiado">
+  <div class="big" id="w-emoji">🏃</div>
+  <p id="w-count"></p>
+  <h2 id="w-label"></h2>
+  <div class="clock" id="w-clock">0:00</div>
+  <div class="bar"><div id="w-bar"></div></div>
+  <p id="w-next"></p>
+  <div class="actions">
+    <button class="btn" id="w-pause">⏸ Pausar</button>
+    <button class="btn ghost" id="w-skip">Próxima etapa ⏭</button>
+    <button class="btn ghost" id="w-stop">Encerrar</button>
+  </div>
+</div>
+
+<dialog id="feel">
+  <div class="box">
+    <h2>Como foi o treino?</h2>
+    <p class="muted">Isso ajuda a decidir quando avançar de etapa — sem pressa.</p>
+    <button class="btn" data-feel="facil">😄 Fácil</button>
+    <button class="btn" data-feel="ok">🙂 Na medida</button>
+    <button class="btn" data-feel="dificil">😮‍💨 Difícil</button>
+    <button class="btn ghost" data-feel="">Agora não</button>
+  </div>
+</dialog>
 
 <div class="toast" id="toast"></div>
 
 <script>
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const EMOJIS = ['🐕','🍽️','💪','🏋️','🏃','🧹','🧺','🗑️','🪴','💊','🛒','📚','🚿','🐈','💧','⭐'];
+const EMOJIS = ['🐕','🍽️','💪','🏋️','🏃','⚽','🚶','🧘','🤸','🧹','🧺','🗑️','🪴','💊','🛒','📚','🚿','🐈','💧','⭐'];
 const KEY = 'meudia.v1';
 const $ = s => document.querySelector(s);
 
@@ -258,19 +340,108 @@ function defaults() {
   };
 }
 function uid() { return Math.random().toString(36).slice(2, 10); }
+
+// ---------- Condicionamento físico: etapas de evolução ----------
+// Cada etapa é repetida quantas vezes for preciso; avançar é sempre escolha do usuário.
+const STEP = {
+  warm: ['🚶', 'Caminhada (aquecimento)'], fast: ['🚶‍♂️', 'Caminhada rápida'],
+  run: ['🏃', 'Corrida leve'], walk: ['🚶', 'Caminhada'], cool: ['🧘', 'Caminhada leve (desaquecer)'],
+};
+const STAGES = [
+  { title: 'Adaptação', goal: 'Acostumar o corpo a alternar caminhada e corrida.',
+    cycles: 5, cycle: [['fast', 3], ['run', 2], ['walk', 1]], cool: 3 },
+  { title: 'Aumento gradual da corrida', goal: 'Um pouco mais de corrida em cada ciclo.',
+    cycles: 5, cycle: [['fast', 2], ['run', 3], ['walk', 1]], cool: 3 },
+  { title: 'Mais tempo correndo', goal: 'Blocos maiores de corrida, com pausas curtas.',
+    warm: 3, cycles: 3, cycle: [['run', 6], ['walk', 2]], cool: 3 },
+  { title: 'Corrida contínua', goal: 'Correr de 15 a 20 minutos em ritmo confortável (dá para conversar correndo).',
+    warm: 5, cycles: 1, cycle: [['run', 15]], cool: 5 },
+];
+function stageSteps(i) {
+  const st = STAGES[i], out = [];
+  const add = (k, min) => out.push({ emoji: STEP[k][0], label: STEP[k][1], min });
+  if (st.warm) add('warm', st.warm);
+  for (let c = 0; c < st.cycles; c++) for (const [k, m] of st.cycle) add(k, m);
+  if (st.cool) add('cool', st.cool);
+  return out;
+}
+function stageLines(i) {
+  const st = STAGES[i], steps = stageSteps(i);
+  const total = steps.reduce((a, x) => a + x.min, 0);
+  const run = steps.filter(x => x.label === STEP.run[1]).reduce((a, x) => a + x.min, 0);
+  const cyc = st.cycle.map(([k, m]) => `${m} min ${STEP[k][1].toLowerCase()}`).join(' + ');
+  const lines = [];
+  if (st.warm) lines.push(`Aquecimento: ${st.warm} min de caminhada`);
+  lines.push(st.cycles > 1 ? `${st.cycles}× (${cyc})` : cyc + (i === STAGES.length - 1 ? ' — se estiver bem, estenda até 20 min' : ''));
+  if (st.cool) lines.push(`Finalizar: ${st.cool} min de caminhada leve`);
+  lines.push(`Total ≈ ${total} min · ${run} min correndo`);
+  return lines;
+}
+// detalhes exibidos no cartão / alarme / notificação
+function taskDetails(t) {
+  if (t.plan === 'resistencia') return [`Etapa ${state.fitness.stage + 1}: ${STAGES[state.fitness.stage].title}`, ...stageLines(state.fitness.stage)];
+  return t.details || [];
+}
+
+// Lembretes de treino adicionados UMA única vez, sem tocar nas tarefas existentes.
+function fitnessSeed() {
+  const f = (name, emoji, time, day, extra) =>
+    ({ id: uid(), name, emoji, times: [time], repeat: 'weekly', days: [day], category: 'fitness', ...extra });
+  return [
+    f('Treino de resistência', '🏃', '07:00', 1, { plan: 'resistencia' }),
+    f('Treino no Democrata (16h)', '⚽', '15:00', 2, { details: ['Treino às 16:00', 'Leve chuteira, caneleira e água', 'Coma algo leve 1 a 2 horas antes'] }),
+    f('Recuperação muscular', '🧘', '20:00', 3, { details: ['Dia de recuperação: sem treino intenso', 'Alongamento leve opcional (5 a 10 min)', 'Beba água e durma bem — amanhã tem Democrata'] }),
+    f('Treino no Democrata (18h)', '⚽', '17:00', 4, { details: ['Treino às 18:00', 'Leve chuteira, caneleira e água', 'Coma algo leve 1 a 2 horas antes'] }),
+    f('Caminhada leve (opcional)', '🚶', '09:00', 6, { details: ['Caminhada leve de 20 a 30 min, sem pressa', 'Recuperação física: se estiver cansado, descanse'] }),
+  ];
+}
+function migrate(s) {
+  s.settings ||= { name: 'Henrico', morningOn: true, morningTime: '06:30' };
+  s.snoozes ||= []; s.done ||= {}; s.fired ||= {};
+  s.skipped ||= {};          // { 'AAAA-MM-DD': { chave: true } }
+  s.history ||= [];          // treinos feitos / pulados
+  s.fitness ||= { stage: 0 };
+  s.seeds ||= {};
+  if (!s.seeds.fitness1) { s.tasks.push(...fitnessSeed()); s.seeds.fitness1 = true; }
+  return s;
+}
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
-    if (s && s.tasks) { s.settings ||= defaults().settings; return s; }
+    if (s && Array.isArray(s.tasks)) return migrate(s);
   } catch {}
-  return defaults();
+  return migrate(defaults());
 }
 let state = load();
 function save() {
-  // guarda só os últimos 14 dias de histórico
+  // guarda só os últimos 14 dias de marcações (o histórico de treinos fica à parte)
   const cutoff = ymd(addDays(new Date(), -14));
-  for (const k of ['done', 'fired']) for (const d in state[k]) if (d < cutoff) delete state[k][d];
+  for (const k of ['done', 'fired', 'skipped']) for (const d in state[k]) if (d < cutoff) delete state[k][d];
+  if (state.history.length > 400) state.history = state.history.slice(-400);
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
+}
+save();
+
+// ---------- Concluir / pular (com histórico para treinos) ----------
+const isFit = t => t && t.category === 'fitness';
+function statusOf(key, day = ymd(new Date())) {
+  return (state.done[day] || {})[key] ? 'done' : (state.skipped[day] || {})[key] ? 'skipped' : null;
+}
+function setStatus(item, status, day = ymd(new Date())) {
+  const { key, task } = item;
+  if (state.done[day]) delete state.done[day][key];
+  if (state.skipped[day]) delete state.skipped[day][key];
+  state.history = state.history.filter(h => !(h.d === day && h.key === key));
+  if (status === 'done') (state.done[day] ||= {})[key] = true;
+  if (status === 'skipped') (state.skipped[day] ||= {})[key] = true;
+  if (status && isFit(task)) {
+    const h = { d: day, key, taskId: task.id, name: task.name, emoji: task.emoji, status, time: item.time };
+    if (task.plan) h.stage = state.fitness.stage;
+    state.history.push(h);
+  }
+  state.snoozes = state.snoozes.filter(x => !(x.taskId === task.id && x.time === item.time));
+  save(); render();
+  if (status === 'done' && task.plan) askFeeling(day, key);
 }
 
 function occursOn(t, date) {
@@ -316,16 +487,30 @@ function render() {
   // Hoje
   const today = ymd(now);
   const items = itemsFor(now);
-  const done = state.done[today] || {};
-  const doneCount = items.filter(i => done[i.key]).length;
+  const doneCount = items.filter(i => statusOf(i.key, today)).length;
   $('#progress-bar').style.width = items.length ? (doneCount / items.length * 100) + '%' : '0';
-  $('#today-list').innerHTML = items.length ? items.map(i => `
-    <div class="task ${done[i.key] ? 'done' : ''}">
+  $('#today-list').innerHTML = items.length ? items.map(i => {
+    const st = statusOf(i.key, today);
+    if (!isFit(i.task)) return `
+    <div class="task ${st || ''}">
       <div class="emoji">${i.task.emoji}</div>
       <div class="info"><div class="name">${esc(i.task.name)}</div>
         <div class="meta">⏰ ${i.time}</div></div>
-      <button class="check" data-toggle="${i.key}" aria-label="Marcar como feito">${done[i.key] ? '✓' : ''}</button>
-    </div>`).join('')
+      <button class="check" data-toggle="${i.key}" aria-label="Marcar como feito">${st === 'done' ? '✓' : ''}</button>
+    </div>`;
+    const det = taskDetails(i.task);
+    return `
+    <div class="task fit ${st || ''}">
+      <div class="emoji">${i.task.emoji}</div>
+      <div class="info"><div class="name">${esc(i.task.name)}</div>
+        <div class="meta">⏰ ${i.time}<span class="tag">Condicionamento</span>${st === 'skipped' ? ' · pulado' : ''}</div>
+        ${det.length && !st ? `<ul class="steps">${det.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>
+      <button class="check" data-toggle="${i.key}" aria-label="Marcar como feito">${st === 'done' ? '✓' : ''}</button>
+      ${st ? '' : `<div class="fit-actions">
+        ${i.task.plan ? `<button class="btn small" data-start="${i.key}">▶ Iniciar treino</button>` : ''}
+        <button class="btn ghost small" data-skip="${i.key}">⏭ Pular</button></div>`}
+    </div>`;
+  }).join('')
     : '<div class="empty">🎉 Nada marcado para hoje.<br>Toque em + para criar uma tarefa.</div>';
   if (items.length && doneCount === items.length)
     $('#today-list').insertAdjacentHTML('beforeend', '<div class="empty">🏆 Tudo feito hoje. Mandou bem!</div>');
@@ -338,19 +523,26 @@ function render() {
     const title = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : cap(d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric' }));
     week += `<div class="day-title">${title}</div><div class="list">` + (its.length ? its.map(x => `
       <div class="task"><div class="emoji">${x.task.emoji}</div>
-        <div class="info"><div class="name">${esc(x.task.name)}</div><div class="meta">⏰ ${x.time}</div></div></div>`).join('')
-      : '<div class="meta" style="color:var(--muted)">Dia livre</div>') + '</div>';
+        <div class="info"><div class="name">${esc(x.task.name)}</div><div class="meta">⏰ ${x.time}${isFit(x.task) ? '<span class="tag">Condicionamento</span>' : ''}</div></div></div>`).join('')
+      : '<div class="meta" style="color:var(--muted)">Dia livre</div>')
+      + (d.getDay() === 0 && state.tasks.some(isFit) ? '<div class="meta" style="color:var(--muted)">😴 Domingo: descanso do condicionamento</div>' : '')
+      + '</div>';
   }
   $('#tab-semana').innerHTML = week;
 
   // Todas
-  $('#all-list').innerHTML = state.tasks.length ? state.tasks.map(t => `
+  const card = t => `
     <div class="task">
       <div class="emoji">${t.emoji}</div>
       <div class="info"><div class="name">${esc(t.name)}</div>
         <div class="meta">⏰ ${t.times.join(', ')} · ${repeatLabel(t)}</div></div>
       <button class="edit" data-edit="${t.id}" aria-label="Editar">✏️</button>
-    </div>`).join('') : '<div class="empty">Nenhuma tarefa ainda.</div>';
+    </div>`;
+  const fit = state.tasks.filter(isFit), other = state.tasks.filter(t => !isFit(t));
+  $('#all-list').innerHTML = !state.tasks.length ? '<div class="empty">Nenhuma tarefa ainda.</div>' :
+    (fit.length ? `<div class="group-title">🏃 Condicionamento físico</div><div class="list">${fit.map(card).join('')}</div>` : '') +
+    (other.length ? `<div class="group-title">📋 Lembretes</div><div class="list">${other.map(card).join('')}</div>` : '');
+  renderFitness();
 
   updateNotifBanner();
 }
@@ -362,14 +554,26 @@ document.querySelector('.tabs').addEventListener('click', e => {
 });
 
 document.addEventListener('click', e => {
+  const findItem = key => itemsFor(new Date()).find(i => i.key === key);
   const tog = e.target.closest('[data-toggle]');
   if (tog) {
-    const today = ymd(new Date());
-    const d = state.done[today] ||= {};
-    d[tog.dataset.toggle] ? delete d[tog.dataset.toggle] : d[tog.dataset.toggle] = true;
-    if (d[tog.dataset.toggle] && navigator.vibrate) navigator.vibrate(30);
-    save(); render();
+    const item = findItem(tog.dataset.toggle);
+    if (item) {
+      const next = statusOf(item.key) === 'done' ? null : 'done';
+      if (next && navigator.vibrate) navigator.vibrate(30);
+      setStatus(item, next);
+    }
   }
+  const sk = e.target.closest('[data-skip]');
+  if (sk) { const item = findItem(sk.dataset.skip); if (item) { setStatus(item, 'skipped'); toast('Treino pulado hoje'); } }
+  const stt = e.target.closest('[data-start]');
+  if (stt) { const item = findItem(stt.dataset.start); if (item) startWorkout(item); }
+  const stg = e.target.closest('[data-stage]');
+  if (stg) {
+    const n = Math.max(0, Math.min(STAGES.length - 1, state.fitness.stage + +stg.dataset.stage));
+    if (n !== state.fitness.stage) { state.fitness.stage = n; save(); render(); toast(`Etapa ${n + 1}: ${STAGES[n].title}`); }
+  }
+  if (e.target.closest('#fit-start-now')) startWorkout(null);
   const ed = e.target.closest('[data-edit]');
   if (ed) openForm(state.tasks.find(t => t.id === ed.dataset.edit));
 });
@@ -387,6 +591,11 @@ $('#f-every').innerHTML = [2,3,4,5,6,7,14].map(n => `<option value="${n}">${n} d
 
 function setEmoji(e) { fEmoji = e; document.querySelectorAll('[data-emoji]').forEach(b => b.classList.toggle('on', b.dataset.emoji === e)); }
 function setDays(ds) { fDays = ds; document.querySelectorAll('[data-day]').forEach(b => b.classList.toggle('on', ds.includes(+b.dataset.day))); }
+function setCat(c) {
+  $('#f-cat').value = c || '';
+  const plan = editing && editing.plan;
+  $('#f-details').hidden = !!plan; $('#f-plan-hint').hidden = !plan;
+}
 function setRepeat(r) { $('#f-repeat').value = r; for (const k of ['weekly', 'interval', 'once']) $('#opt-' + k).hidden = k !== r; }
 function addTimeRow(v) {
   const row = document.createElement('div'); row.className = 'row';
@@ -407,6 +616,8 @@ function openForm(t) {
   $('#f-every').value = t && t.every ? t.every : 2;
   $('#f-start').value = t && t.start ? t.start : today;
   $('#f-date').value = t && t.date ? t.date : today;
+  $('#f-details').value = t && t.details ? t.details.join('\n') : '';
+  setCat(t ? t.category : '');
   $('#f-delete').hidden = !t;
   $('#dlg').showModal();
 }
@@ -433,11 +644,20 @@ $('#form').onsubmit = e => {
   const times = [...new Set([...$('#f-times').querySelectorAll('input')].map(i => i.value).filter(Boolean))].sort();
   if (!times.length) return toast('Escolha um horário');
   const t = { id: editing ? editing.id : uid(), name: $('#f-name').value.trim(), emoji: fEmoji, times, repeat };
+  if ($('#f-cat').value) t.category = $('#f-cat').value;
+  if (editing && editing.plan) t.plan = editing.plan;
+  else {
+    const det = $('#f-details').value.split('\n').map(x => x.trim()).filter(Boolean);
+    if (det.length) t.details = det;
+  }
   if (repeat === 'weekly') t.days = fDays.slice().sort();
   if (repeat === 'interval') { t.every = +$('#f-every').value; t.start = $('#f-start').value || ymd(new Date()); }
   if (repeat === 'once') t.date = $('#f-date').value || ymd(new Date());
   if (editing) state.tasks[state.tasks.indexOf(editing)] = t; else state.tasks.push(t);
-  save(); render(); $('#dlg').close(); toast('Tarefa salva ✓');
+  save(); render(); $('#dlg').close();
+  // véspera do Democrata (segunda e quarta): só aviso, nunca bloqueia
+  const eve = t.category === 'fitness' && repeat === 'weekly' && t.days.some(d => d === 1 || d === 3) && !t.plan && !/recupera|along/i.test(t.name);
+  toast(eve ? 'Salvo ✓ — é véspera de treino no Democrata: mantenha leve' : 'Tarefa salva ✓');
   askNotifications();
 };
 
@@ -471,8 +691,11 @@ function ring(item) {
   $('#alarm-name').textContent = item.task.name;
   $('#alarm-time').textContent = item.morning ? 'Seu dia de hoje:' : `⏰ ${item.time}` + (item.snoozed ? ' (adiado)' : '');
   $('#alarm-summary').innerHTML = item.morning
-    ? (item.text.list.length ? item.text.list.map(esc).join('<br>') : 'Nenhuma tarefa hoje 🎉') : '';
+    ? (item.text.list.length ? item.text.list.map(esc).join('<br>') : 'Nenhuma tarefa hoje 🎉')
+    : taskDetails(item.task).map(esc).join('<br>');
   $('#alarm-speak').hidden = !item.morning;
+  $('#alarm-skip').hidden = !isFit(item.task);
+  $('#alarm-start').hidden = !item.task.plan;
   $('#alarm-done').textContent = item.morning ? 'Ok, bora! 💪' : '✓ Feito!';
   $('#alarm').classList.add('show');
   unlockAudio(); startBeeps();
@@ -497,11 +720,11 @@ function closeAlarm() {
 $('#alarm-stop').onclick = () => { stopSound(); if (window.speechSynthesis) speechSynthesis.cancel(); };
 $('#alarm-speak').onclick = () => { stopSound(); speak(morningText().speech); };
 $('#alarm-done').onclick = () => {
-  if (current.morning) return closeAlarm();
-  const today = ymd(new Date());
-  (state.done[today] ||= {})[current.key] = true;
-  save(); render(); closeAlarm(); toast('Boa! ✓');
+  if (current.morning || current.key === 'teste') return closeAlarm();
+  const item = current; closeAlarm(); setStatus(item, 'done'); toast('Boa! ✓');
 };
+$('#alarm-skip').onclick = () => { const item = current; closeAlarm(); setStatus(item, 'skipped'); toast('Treino pulado hoje'); };
+$('#alarm-start').onclick = () => { const item = current; closeAlarm(); startWorkout(item); };
 $('#alarm-snooze').onclick = () => {
   if (current.morning) {
     state.snoozes.push({ morning: true, at: Date.now() + 10 * 60000 });
@@ -517,7 +740,9 @@ $('#test-alarm').onclick = () => {
 
 async function notify(item) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const opts = { body: item.morning ? item.text.list.join('\n') || 'Nenhuma tarefa hoje' : `⏰ ${item.time} — toque para abrir`, tag: item.key, renotify: true,
+  const det = item.morning ? [] : taskDetails(item.task);
+  const opts = { body: item.morning ? item.text.list.join('\n') || 'Nenhuma tarefa hoje'
+      : `⏰ ${item.time}` + (det.length ? '\n' + det.join('\n') : ' — toque para abrir'), tag: item.key, renotify: true,
     requireInteraction: true, vibrate: [400, 200, 400], icon: 'icon-192.png', badge: 'icon-192.png' };
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
@@ -534,7 +759,7 @@ function tick() {
   const done = state.done[today] || {};
   let changed = false;
   for (const item of itemsFor(now)) {
-    if (fired[item.key] || done[item.key]) continue;
+    if (fired[item.key] || statusOf(item.key, today)) continue;
     // toca no horário ou até 5 minutos depois (caso o celular tenha atrasado o app)
     const [h, m] = item.time.split(':').map(Number);
     const late = (now - new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m)) / 60000;
@@ -550,7 +775,7 @@ function tick() {
     state.snoozes.splice(state.snoozes.indexOf(s), 1); changed = true;
     if (s.morning) { ringMorning(); continue; }
     const task = state.tasks.find(t => t.id === s.taskId);
-    if (task && !done[`${task.id}@${s.time}`]) ring({ task, time: s.time, key: `${task.id}@${s.time}`, snoozed: true });
+    if (task && !statusOf(`${task.id}@${s.time}`, today)) ring({ task, time: s.time, key: `${task.id}@${s.time}`, snoozed: true });
   }
   if (changed) save();
   if (ymd(now) !== tick.lastDay) { tick.lastDay = ymd(now); render(); }
@@ -626,6 +851,126 @@ mName.oninput = () => { state.settings.name = mName.value; save(); };
 mTime.onchange = () => { if (mTime.value) { state.settings.morningTime = mTime.value; save(); } };
 $('#m-test').onclick = () => { unlockAudio(); speak(morningText().speech); };
 
+// ---------- Treino guiado (cronômetro com voz) ----------
+let W = null, wakeLock = null;
+function fmt(sec) { sec = Math.max(0, Math.ceil(sec)); return `${Math.floor(sec / 60)}:${pad(sec % 60)}`; }
+async function startWorkout(item) {
+  const task = item ? item.task : state.tasks.find(t => t.plan === 'resistencia');
+  if (!task) return toast('Treino de resistência não encontrado');
+  if (!item) item = itemsFor(new Date()).find(i => i.task === task) || { task, key: `${task.id}@livre`, time: '' };
+  unlockAudio();
+  W = { item, steps: stageSteps(state.fitness.stage), idx: -1, end: 0, left: 0, paused: false, timer: null };
+  W.total = W.steps.reduce((a, x) => a + x.min * 60, 0);
+  $('#workout').classList.add('show');
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
+  nextStep();
+  W.timer = setInterval(updateWorkout, 300);
+}
+function nextStep() {
+  W.idx++;
+  if (W.idx >= W.steps.length) return finishWorkout(true);
+  const st = W.steps[W.idx];
+  W.end = Date.now() + st.min * 60000; W.paused = false; $('#w-pause').textContent = '⏸ Pausar';
+  beep(); if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+  speak(`${st.label}, ${st.min} ${st.min === 1 ? 'minuto' : 'minutos'}`);
+  updateWorkout();
+}
+function updateWorkout() {
+  if (!W) return;
+  const st = W.steps[W.idx], left = W.paused ? W.left : (W.end - Date.now()) / 1000;
+  if (left <= 0 && !W.paused) return nextStep();
+  const doneSec = W.steps.slice(0, W.idx).reduce((a, x) => a + x.min * 60, 0) + st.min * 60 - left;
+  $('#w-emoji').textContent = st.emoji;
+  $('#w-label').textContent = st.label;
+  $('#w-count').textContent = `Parte ${W.idx + 1} de ${W.steps.length}`;
+  $('#w-clock').textContent = fmt(left);
+  $('#w-bar').style.width = (doneSec / W.total * 100) + '%';
+  const nx = W.steps[W.idx + 1];
+  $('#w-next').textContent = nx ? `Depois: ${nx.label} (${nx.min} min)` : 'Última etapa!';
+}
+function closeWorkout() {
+  clearInterval(W && W.timer); W = null;
+  $('#workout').classList.remove('show');
+  try { wakeLock && wakeLock.release(); } catch {} wakeLock = null;
+}
+function finishWorkout(complete) {
+  const item = W.item;
+  closeWorkout();
+  if (complete) { beep(); speak('Treino concluído. Mandou bem!'); }
+  setStatus(item, 'done'); // grava no histórico e pergunta como foi
+}
+$('#w-pause').onclick = () => {
+  if (!W) return;
+  if (W.paused) { W.end = Date.now() + W.left * 1000; W.paused = false; $('#w-pause').textContent = '⏸ Pausar'; }
+  else { W.left = (W.end - Date.now()) / 1000; W.paused = true; $('#w-pause').textContent = '▶ Continuar'; }
+  updateWorkout();
+};
+$('#w-skip').onclick = () => W && nextStep();
+$('#w-stop').onclick = () => {
+  if (!W) return;
+  if (confirm('Encerrar o treino agora?\nOK = salvar como feito · Cancelar = sair sem salvar')) finishWorkout(false);
+  else { if (window.speechSynthesis) speechSynthesis.cancel(); closeWorkout(); }
+};
+
+// ---------- "Como foi?" ----------
+let feelTarget = null;
+function askFeeling(d, key) { feelTarget = { d, key }; $('#feel').showModal(); }
+$('#feel').onclick = e => {
+  const b = e.target.closest('[data-feel]'); if (!b) return;
+  const h = feelTarget && state.history.find(x => x.d === feelTarget.d && x.key === feelTarget.key);
+  if (h && b.dataset.feel) { h.feeling = b.dataset.feel; save(); render(); }
+  $('#feel').close();
+};
+
+// ---------- Painel de evolução (aba Tarefas) ----------
+const FEEL = { facil: '😄', ok: '🙂', dificil: '😮‍💨' };
+function weekStart(d) { const x = parseYmd(ymd(d)); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; } // segunda
+function renderFitness() {
+  const el = $('#fit-card');
+  const hasPlan = state.tasks.some(t => t.plan === 'resistencia');
+  if (!state.tasks.some(isFit) && !state.history.length) { el.hidden = true; return; }
+  el.hidden = false;
+  const i = state.fitness.stage, st = STAGES[i];
+  const sessions = state.history.filter(h => h.stage === i && h.status === 'done');
+  const last2 = state.history.filter(h => h.stage != null && h.status === 'done').slice(-2);
+  let tip;
+  if (last2.length === 2 && last2.every(h => h.feeling === 'dificil'))
+    tip = 'Os últimos treinos foram difíceis. Tudo bem repetir esta etapa quantas vezes precisar' + (i ? ' — ou voltar uma.' : '.');
+  else if (i < STAGES.length - 1 && sessions.length >= 2 && !sessions.slice(-2).some(h => h.feeling === 'dificil'))
+    tip = `Você já fez ${sessions.length} treinos nesta etapa sem dificuldade. Se sentir que está pronto, pode avançar para a etapa ${i + 2}.`;
+  else if (i === STAGES.length - 1 && sessions.length)
+    tip = 'Você chegou à corrida contínua! Mantenha o ritmo confortável e vá aumentando até 20 minutos quando estiver fácil.';
+  else tip = `Faça pelo menos 2 treinos nesta etapa (${sessions.length} até agora) antes de pensar em avançar. Sem pressa.`;
+
+  // últimas 4 semanas (segunda a domingo)
+  const weeks = [];
+  for (let w = 0; w < 4; w++) {
+    const ini = addDays(weekStart(new Date()), -7 * w), fim = addDays(ini, 6);
+    const hs = state.history.filter(h => h.d >= ymd(ini) && h.d <= ymd(fim));
+    weeks.push(`<div><span>${w === 0 ? 'Esta semana' : 'Semana de ' + ini.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+      <span>✅ ${hs.filter(h => h.status === 'done').length} · ⏭️ ${hs.filter(h => h.status === 'skipped').length}</span></div>`);
+  }
+  const hist = state.history.slice(-10).reverse().map(h => `<div><span>${h.status === 'done' ? '✅' : '⏭️'}</span>
+    <span>${h.emoji} ${esc(h.name)}${h.stage != null ? ` · etapa ${h.stage + 1}` : ''} ${h.feeling ? FEEL[h.feeling] : ''}</span>
+    <span>${parseYmd(h.d).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}</span></div>`).join('');
+
+  el.innerHTML = `
+    <h3>🏃 Condicionamento físico</h3>
+    ${hasPlan ? `
+    <div class="stages">${STAGES.map((_, k) => `<span class="${k < i ? 'on' : k === i ? 'cur' : ''}"></span>`).join('')}</div>
+    <div><strong>Etapa ${i + 1} de ${STAGES.length}: ${st.title}</strong><p class="muted">${st.goal}</p></div>
+    <ul class="fit-plan">${stageLines(i).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    <p class="suggest">💡 ${tip}</p>
+    <div class="row">
+      <button class="btn ghost small" data-stage="-1" ${i === 0 ? 'disabled' : ''}>◀ Etapa anterior</button>
+      <button class="btn ghost small" data-stage="1" ${i === STAGES.length - 1 ? 'disabled' : ''}>Próxima etapa ▶</button>
+    </div>
+    <button class="btn" id="fit-start-now">▶ Iniciar treino guiado agora</button>` : ''}
+    <p class="muted">Ter 16h e Qui 18h: Democrata ⚽ · Seg e Qua são véspera: nada intenso · Domingo: descanso 😴</p>
+    <div><strong>Evolução semanal</strong><div class="hist" style="margin-top:6px">${weeks.join('')}</div></div>
+    <div><strong>Histórico de treinos</strong><div class="hist" style="margin-top:6px">${hist || '<p class="muted">Nenhum treino registrado ainda. Conclua ou pule um treino para ele aparecer aqui.</p>'}</div></div>`;
+}
+
 // ---------- Notificações ----------
 function updateNotifBanner() {
   $('#notif-banner').hidden = !('Notification' in window) || Notification.permission !== 'default';
@@ -659,8 +1004,10 @@ $('#export-ics').onclick = () => {
     const dt = `${ymd(start).replace(/-/g, '')}T${h}${m}00`;
     lines.push('BEGIN:VEVENT', `UID:${t.id}-${h}${m}@meudia`, `DTSTAMP:${stamp}`,
       `DTSTART:${dt}`, 'DURATION:PT15M', `SUMMARY:${icsEsc(t.emoji + ' ' + t.name)}`);
+    const det = taskDetails(t);
+    if (det.length) lines.push(`DESCRIPTION:${icsEsc(det.join('\n'))}`);
     if (rule) lines.push(rule);
-    lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(t.name)}`, 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT');
+    lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(det.length ? t.name + ' — ' + det[0] : t.name)}`, 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT');
   }
   if (state.settings.morningOn) {
     const [h, m] = state.settings.morningTime.split(':');
