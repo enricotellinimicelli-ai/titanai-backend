@@ -102,6 +102,14 @@
   #alarm .btn.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.5); }
   @keyframes ring { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
   @media (prefers-reduced-motion: reduce) { #alarm .big { animation: none; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 16px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+  .card h3 { margin: 0; font-size: 17px; }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; }
+  .switch input { width: 48px; height: 28px; accent-color: var(--accent); flex-shrink: 0; }
+  #alarm .summary { font-size: 17px; max-width: 420px; text-align: left; background: rgba(255,255,255,.12);
+    border-radius: 14px; padding: 12px 16px; line-height: 1.6; }
+  #alarm .summary:empty { display: none; }
   .toast { position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom));
     transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px;
     border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none;
@@ -135,6 +143,16 @@
   <section id="tab-semana" hidden></section>
 
   <section id="tab-todas" hidden>
+    <div class="card">
+      <h3>☀️ Resumo da manhã</h3>
+      <label class="switch">Ligado<input type="checkbox" id="m-on"></label>
+      <div class="row">
+        <div><label for="m-name">Seu nome</label><input id="m-name" maxlength="30" placeholder="Ex.: Henrico"></div>
+        <div><label for="m-time">Horário</label><input type="time" id="m-time"></div>
+      </div>
+      <button class="btn ghost" id="m-test">▶ Ouvir o resumo de hoje</button>
+      <p class="hint" style="margin:0">No horário, o alarme toca e uma voz lê as suas tarefas do dia.</p>
+    </div>
     <div class="list" id="all-list"></div>
     <div class="tools">
       <button class="btn ghost" id="export-ics">📅 Exportar para o calendário do celular</button>
@@ -198,7 +216,9 @@
   <div class="big" id="alarm-emoji">⏰</div>
   <h2 id="alarm-name"></h2>
   <p id="alarm-time"></p>
+  <div class="summary" id="alarm-summary"></div>
   <div class="actions">
+    <button class="btn" id="alarm-speak" hidden>🔊 Ouvir meu dia</button>
     <button class="btn" id="alarm-done">✓ Feito!</button>
     <button class="btn ghost" id="alarm-snooze">Lembrar em 10 min</button>
     <button class="btn ghost" id="alarm-stop">Só parar o som</button>
@@ -233,12 +253,16 @@ function defaults() {
     ],
     done: {},   // { 'AAAA-MM-DD': { 'idTarefa@HH:MM': true } }
     fired: {},  // alarmes já tocados por dia
-    snoozes: [] // { taskId, time, at (ms) }
+    snoozes: [], // { taskId, time, at (ms) }
+    settings: { name: 'Henrico', morningOn: true, morningTime: '06:30' }
   };
 }
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function load() {
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.tasks) return s; } catch {}
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && s.tasks) { s.settings ||= defaults().settings; return s; }
+  } catch {}
   return defaults();
 }
 let state = load();
@@ -445,9 +469,18 @@ function ring(item) {
   current = item;
   $('#alarm-emoji').textContent = item.task.emoji;
   $('#alarm-name').textContent = item.task.name;
-  $('#alarm-time').textContent = `⏰ ${item.time}` + (item.snoozed ? ' (adiado)' : '');
+  $('#alarm-time').textContent = item.morning ? 'Seu dia de hoje:' : `⏰ ${item.time}` + (item.snoozed ? ' (adiado)' : '');
+  $('#alarm-summary').innerHTML = item.morning
+    ? (item.text.list.length ? item.text.list.map(esc).join('<br>') : 'Nenhuma tarefa hoje 🎉') : '';
+  $('#alarm-speak').hidden = !item.morning;
+  $('#alarm-done').textContent = item.morning ? 'Ok, bora! 💪' : '✓ Feito!';
   $('#alarm').classList.add('show');
-  unlockAudio(); beep();
+  unlockAudio(); startBeeps();
+  notify(item);
+  if (item.morning) morningVoice(item);
+}
+function startBeeps() {
+  beep();
   if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
   clearInterval(beepTimer);
   let n = 0;
@@ -455,20 +488,25 @@ function ring(item) {
     beep(); if (navigator.vibrate && n % 3 === 0) navigator.vibrate([400, 200, 400]);
     if (++n > 90) stopSound(); // para sozinho após ~2 minutos
   }, 1300);
-  notify(item);
 }
 function stopSound() { clearInterval(beepTimer); beepTimer = null; if (navigator.vibrate) navigator.vibrate(0); }
 function closeAlarm() {
-  stopSound(); $('#alarm').classList.remove('show'); current = null;
+  stopSound(); if (window.speechSynthesis) speechSynthesis.cancel(); $('#alarm').classList.remove('show'); current = null;
   if (queue.length) setTimeout(() => ring(queue.shift()), 400);
 }
-$('#alarm-stop').onclick = stopSound;
+$('#alarm-stop').onclick = () => { stopSound(); if (window.speechSynthesis) speechSynthesis.cancel(); };
+$('#alarm-speak').onclick = () => { stopSound(); speak(morningText().speech); };
 $('#alarm-done').onclick = () => {
+  if (current.morning) return closeAlarm();
   const today = ymd(new Date());
   (state.done[today] ||= {})[current.key] = true;
   save(); render(); closeAlarm(); toast('Boa! ✓');
 };
 $('#alarm-snooze').onclick = () => {
+  if (current.morning) {
+    state.snoozes.push({ morning: true, at: Date.now() + 10 * 60000 });
+    save(); closeAlarm(); return toast('Vou te chamar de novo em 10 minutos');
+  }
   state.snoozes.push({ taskId: current.task.id, time: current.time, at: Date.now() + 10 * 60000 });
   save(); closeAlarm(); toast('Vou lembrar de novo em 10 minutos');
 };
@@ -479,7 +517,7 @@ $('#test-alarm').onclick = () => {
 
 async function notify(item) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const opts = { body: `⏰ ${item.time} — toque para abrir`, tag: item.key, renotify: true,
+  const opts = { body: item.morning ? item.text.list.join('\n') || 'Nenhuma tarefa hoje' : `⏰ ${item.time} — toque para abrir`, tag: item.key, renotify: true,
     requireInteraction: true, vibrate: [400, 200, 400], icon: 'icon-192.png', badge: 'icon-192.png' };
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
@@ -503,14 +541,90 @@ function tick() {
     if (late >= 0 && late < 5) { fired[item.key] = true; changed = true; ring(item); }
     else if (item.time < hm) { fired[item.key] = true; changed = true; } // perdido; não toca atrasado demais
   }
+  if (state.settings.morningOn && !fired.manha) {
+    const [h, m] = state.settings.morningTime.split(':').map(Number);
+    const late = (now - new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m)) / 60000;
+    if (late >= 0) { fired.manha = true; changed = true; if (late < 30) ringMorning(); }
+  }
   for (const s of state.snoozes.slice()) if (s.at <= Date.now()) {
     state.snoozes.splice(state.snoozes.indexOf(s), 1); changed = true;
+    if (s.morning) { ringMorning(); continue; }
     const task = state.tasks.find(t => t.id === s.taskId);
     if (task && !done[`${task.id}@${s.time}`]) ring({ task, time: s.time, key: `${task.id}@${s.time}`, snoozed: true });
   }
   if (changed) save();
   if (ymd(now) !== tick.lastDay) { tick.lastDay = ymd(now); render(); }
 }
+
+// ---------- Resumo da manhã (voz) ----------
+function speakTime(t) {
+  const [h, m] = t.split(':').map(Number);
+  const hs = h === 1 ? '1 hora' : h === 0 ? 'meia-noite' : `${h} horas`;
+  return m ? `${h === 0 ? 'meia-noite' : h} e ${m}` : hs;
+}
+function morningText(date = new Date()) {
+  const name = state.settings.name.trim();
+  const h = date.getHours();
+  const hello = (h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite') + (name ? `, ${name}` : '') + '!';
+  const day = date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  // agrupa horários da mesma tarefa: "levar o cachorro para passear, às 7 horas e às 18 e 30"
+  const groups = [];
+  for (const i of itemsFor(date)) {
+    const g = groups.find(x => x.task === i.task);
+    g ? g.times.push(i.time) : groups.push({ task: i.task, times: [i.time] });
+  }
+  const lines = groups.map(g => `${g.task.name}, ${g.times.map(t => 'às ' + speakTime(t)).join(' e ')}`);
+  const list = groups.map(g => `${g.task.emoji} ${g.times.join(', ')} — ${g.task.name}`);
+  let speech = `${hello} Hoje é ${day}. `;
+  if (!groups.length) speech += 'Hoje você não tem nenhuma tarefa marcada. Aproveite o dia!';
+  else speech += `Hoje você tem ${groups.length === 1 ? 'uma tarefa' : groups.length + ' tarefas'}: ` +
+    lines.join('; ') + '. Bora lá, você consegue!';
+  return { hello, speech, list };
+}
+
+let ptVoice = null;
+function pickVoice() {
+  const vs = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+  ptVoice = vs.find(v => v.lang === 'pt-BR') || vs.find(v => v.lang && v.lang.startsWith('pt')) || null;
+}
+if (window.speechSynthesis) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+// Fala o texto. Retorna uma Promise que resolve true se a fala começou.
+function speak(text) {
+  return new Promise(resolve => {
+    if (!window.speechSynthesis) return resolve(false);
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'pt-BR'; if (ptVoice) u.voice = ptVoice; u.rate = 0.95;
+    let ok = false;
+    u.onstart = () => { ok = true; resolve(true); };
+    u.onerror = () => { if (!ok) resolve(false); };
+    speechSynthesis.speak(u);
+    setTimeout(() => { if (!ok) resolve(speechSynthesis.speaking); }, 2500);
+  });
+}
+
+function ringMorning() {
+  const m = morningText();
+  ring({ morning: true, task: { id: 'manha', emoji: '☀️', name: m.hello }, time: state.settings.morningTime, key: 'manha', text: m });
+}
+
+async function morningVoice(item) {
+  // toca uns bipes, depois fala; se o celular bloquear a voz, continua bipando até tocar na tela
+  await new Promise(r => setTimeout(r, 4000));
+  if (current !== item) return;
+  stopSound();
+  const ok = await speak(item.text.speech);
+  if (!ok && current === item) { startBeeps(); toast('Toque em “Ouvir meu dia” para escutar'); }
+}
+
+const mOn = $('#m-on'), mName = $('#m-name'), mTime = $('#m-time');
+function fillSettings() { mOn.checked = state.settings.morningOn; mName.value = state.settings.name; mTime.value = state.settings.morningTime; }
+fillSettings();
+mOn.onchange = () => { state.settings.morningOn = mOn.checked; save(); askNotifications(); };
+mName.oninput = () => { state.settings.name = mName.value; save(); };
+mTime.onchange = () => { if (mTime.value) { state.settings.morningTime = mTime.value; save(); } };
+$('#m-test').onclick = () => { unlockAudio(); speak(morningText().speech); };
 
 // ---------- Notificações ----------
 function updateNotifBanner() {
@@ -547,6 +661,13 @@ $('#export-ics').onclick = () => {
       `DTSTART:${dt}`, 'DURATION:PT15M', `SUMMARY:${icsEsc(t.emoji + ' ' + t.name)}`);
     if (rule) lines.push(rule);
     lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(t.name)}`, 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT');
+  }
+  if (state.settings.morningOn) {
+    const [h, m] = state.settings.morningTime.split(':');
+    lines.push('BEGIN:VEVENT', `UID:resumo-manha@meudia`, `DTSTAMP:${stamp}`,
+      `DTSTART:${ymd(new Date()).replace(/-/g, '')}T${h}${m}00`, 'DURATION:PT10M',
+      'SUMMARY:☀️ Bom dia! Abra o Meu Dia para ouvir seu dia', 'RRULE:FREQ=DAILY',
+      'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Abra o Meu Dia', 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT');
   }
   lines.push('END:VCALENDAR');
   const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });

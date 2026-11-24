@@ -1,5 +1,5 @@
 // Service worker: deixa o app funcionar offline e abre o app ao tocar na notificação.
-const CACHE = 'meudia-v1';
+const CACHE = 'meudia-v2';
 const FILES = ['./', 'index.html', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -10,6 +10,9 @@ lavar a louça, academia, treino etc.
   (rodízio, ex.: louça dia sim, dia não) ou uma vez só. Vários horários por tarefa.
 - **Alarme**: no horário, tela cheia com som + vibração + notificação.
   Botões "Feito", "Lembrar em 10 min" e "Só parar o som".
+- **Resumo da manhã**: num horário escolhido (padrão 06:30), o alarme toca e uma voz
+  diz "Bom dia, Henrico! Hoje você tem: ..." com as tarefas e horários do dia.
+  Nome e horário ficam em Tarefas → Resumo da manhã.
 - **Exportar para o calendário**: gera um `.ics` com as tarefas repetidas e
   alarme, para o calendário do celular tocar mesmo com o app fechado.
 - Os dados ficam salvos no próprio celular (sem login, sem servidor).
